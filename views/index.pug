@@ -101,4 +101,111 @@ block content
         tbody.text-center
     .footer-padding
       
-              
+  script(type='text/javascript').
+    //send XmlHttpRequest and work with xhr-response
+    function sendXHR(
+    		type		//GET or POST
+    	,	url			//url
+    	,	async		//true or false
+    	,	data		//data to send
+    	,	callback	//callback function for xhr.response
+    ){
+    	var xhr = new XMLHttpRequest();
+    	xhr.open(type, url, async);
+    
+    	xhr.onload = function () {
+    		callback(xhr.response);
+    	};
+    	xhr.send(data);
+    }
+    
+    //define variables with start and end block to sync into db.
+    var start_block = 0;
+    var end_block = 0;
+    
+    //get last block from db
+    sendXHR(
+    		'GET'
+    	,	'./ext/getlasttxsajax/100'
+    	,	true
+    	,	null
+    	,	function(response){
+    			var last_block = JSON.parse(response)['data'][0][0];
+    			console.log('last_block in db: ', last_block);
+    			start_block = last_block;
+    		}
+    );
+    
+    //get last block from daemon
+    sendXHR(
+    		'GET'
+    	,	'./api/getblockcount'
+    	,	true
+    	,	null
+    	,	function(response){
+    			var last_block = JSON.parse(response);
+    			console.log('last_block on daemon: ', last_block);
+    			end_block = last_block;
+    			setTimeout(
+    					function(){start_sync();}
+    				,	1000
+    			);
+    		}
+    );
+    
+    //start sync from block in db, up to last block on daemon.
+    function start_sync(){
+    	var api = './api/getblockhash?index=';
+    	var link = './block/';
+    	var sleep = false;
+    	var busy = false;
+    
+    	var block = 0;
+    	block = start_block;
+    
+    	function loadBlockHash(BlockNumber){
+    		busy = true;
+    		sendXHR(	'GET', (api+BlockNumber), true, null,
+    			function(response){
+    				var BlockNotFound = (response.indexOf('Block number out of range.') !== -1);
+    				if(BlockNotFound){
+    					console.log('Block '+BlockNumber+' - not found...');
+    					sleep = true;
+    					//block--;
+    					busy = false;
+    				}
+    				else{
+    					sleep = false;
+    					var block_hash = response.substring(1, response.length-1);
+    					console.log('Block '+BlockNumber+' found.', 'block_hash: ', block_hash);
+    					block++;
+    					sendXHR(	'GET', (link+(BlockNumber)), true, null, function(){busy = false;}	); //after this request, block adding in db automatically
+    				}
+    			}
+    		);
+    	}
+    	var timeout;	//define dynamic variable.
+    	function sync(){
+    		if(busy === true){return;}
+    
+    		//console.log('sleep', sleep);
+    		if(sleep === true){
+    			if(timeout !== 10000){
+    				timeout = 10000;
+    				clearInterval(interval);
+    				interval = setInterval(sync, timeout);
+    			}
+    		}
+    		else{
+    			if(timeout !== 100){
+    				timeout = 100;
+    				clearInterval(interval);
+    				interval = setInterval(sync, timeout);
+    			}
+    		}
+    		loadBlockHash(block);
+    	}
+    
+    	var interval = setInterval(sync, timeout);
+    }
+    
