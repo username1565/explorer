@@ -23,6 +23,7 @@ function usage() {
   console.log('update       Updates index from last sync to current block');
   console.log('check        checks index for (and adds) any missing transactions/addresses');
   console.log('reindex      Clears index then resyncs from genesis to current block');
+  console.log('reindex-rich Re-index rich-list.');
   console.log('');
   console.log('notes:');
   console.log('* \'current block\' is the latest created block when script is executed.');
